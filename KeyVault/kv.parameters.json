@@ -1,0 +1,33 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "keyVaultName": {
+        "value": ""
+      },
+      "kv_accessSpnId": {
+        "value": ""        
+      },
+      "networkAclsBypass": {
+        "value": "AzureServices"
+      },
+      "networkAclsDefaultAction": {
+          "value": "Deny"
+      },
+      "skuName": {
+        "value": "Standard"
+      },
+      "ApplicationName": {
+        "value": "SIMS.HCM"
+      }, 
+      "ApplicationOwner": {
+        "value": ""
+      }, 
+      "ApplicationSponsor": {
+        "value": ""
+      }, 
+      "EnvironmentType": {
+        "value": ""
+      }
+    }
+}

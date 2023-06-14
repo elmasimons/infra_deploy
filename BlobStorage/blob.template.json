@@ -1,0 +1,195 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+
+    "parameters": {
+        "storageAccountName": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "Provides the storage account name."
+            }
+        },
+        "containerName": {
+            "defaultValue": "container",
+            "type": "String",
+            "metadata": {
+                "description": "Provides the storage account name."
+            }
+        },
+        "accountType": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "Provides the Account Type."
+            }
+        },
+        "kind": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "Provides the Kindof store."
+            }
+        },
+        "accessTier": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "Provides the access tier."
+            }
+        },
+        "minimumTlsVersion": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "Provides the minimum TLS version."
+            }
+        },
+        "supportsHttpsTrafficOnly": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Indicates whether HTTPS traffic is supported"
+            }
+        },
+        "allowBlobPublicAccess": {
+            "type": "bool",
+            "defaultValue": false,
+            "metadata": {
+                "description": "Indicates whether public access is allowed"
+            }
+        },
+        "networkAclsBypass": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "Indicates whether network Acls bypass."
+            }
+        },
+        "networkAclsDefaultAction": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "Indicates network Acls default action"
+            }
+        },
+        "keySource": {
+            "type": "string"
+        },
+        "ApplicationName": {
+            "type": "string",
+            "metadata": {
+                "description": "Provides the business Line Sodexo Region Sodexo Country Name of the application (8-letter code)."
+            }
+        },
+        "ApplicationOwner": {
+            "type": "string",
+            "metadata": {
+                "description": "Provides the information on the App/Resource owner."
+            }
+        },
+        "ApplicationSponsor": {
+            "type": "string",
+            "metadata": {
+                "description": "Provides the information on the App/Resource sponsor."
+            }
+        },
+        "EnvironmentType": {
+            "type": "string",
+            "metadata": {
+                "description": "Provides information on what the resource group is used for (useful for maintenance, policy enforcement, chargeback, etc.)."
+            }
+        },
+        "DeploymentDate": {
+            "type": "string",
+            "defaultValue": "[utcNow('u')]",
+            "metadata": {
+                "description": "Provides the date when the asset were created."
+            }
+        },
+        
+        "needsSynapseConnection": {
+            "type": "bool",
+            "defaultValue": false,
+            "metadata": {
+                "description": "Whether private endpoint is needed"
+            }
+        },
+        "needsContainer": {
+            "type": "bool",
+            "defaultValue": false,
+            "metadata": {
+                "description": "Whether container should be created within Blob"
+            }
+        },
+        "encryptionEnabled": {
+            "type": "bool"
+        }        
+    },
+    "variables": {
+        "storageAccountApiVersion": "2022-05-01",  
+        "storageAccountNameTidy": "[toLower(trim(parameters('storageAccountName')))]"        
+    },
+    "resources": [
+        {
+            "name": "[parameters('storageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "[variables('storageAccountApiVersion')]",
+            "location": "[resourceGroup().location]",
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "accessTier": "[parameters('accessTier')]",
+                "minimumTlsVersion": "[parameters('minimumTlsVersion')]",
+                "supportsHttpsTrafficOnly": "[parameters('supportsHttpsTrafficOnly')]",
+                "allowBlobPublicAccess": "[parameters('allowBlobPublicAccess')]",
+                "networkAcls": {
+                    "bypass": "[parameters('networkAclsBypass')]",
+                    "defaultAction": "[parameters('networkAclsDefaultAction')]",
+                    "ipRules": []
+                },
+                "encryption": {
+                    "keySource": "[parameters('keySource')]",
+                    "services": {
+                        "blob": {
+                            "enabled": "[parameters('encryptionEnabled')]"
+                        },
+                        "file": {
+                            "enabled": "[parameters('encryptionEnabled')]"
+                        },
+                        "table": {
+                            "enabled": "[parameters('encryptionEnabled')]"
+                        },
+                        "queue": {
+                            "enabled": "[parameters('encryptionEnabled')]"
+                        }
+                    }
+                }              
+            },
+            "dependsOn": [],
+            "sku": {
+                "name": "[parameters('accountType')]"
+            },
+            "kind": "[parameters('kind')]",
+            "tags": {
+                "ApplicationName": "[parameters('ApplicationName')]",
+                "ApplicationOwner": "[parameters('ApplicationOwner')]",
+                "ApplicationSponsor": "[parameters('ApplicationSponsor')]",
+                "EnvironmentType": "[parameters('EnvironmentType')]",
+                "ExpirationDate":"[dateTimeAdd(parameters('DeploymentDate'), 'P10Y')]",
+                "DeploymentDate": "[parameters('DeploymentDate')]"
+            }
+        }
+    ],
+    "outputs": {
+        "blobKey": {
+        "type": "string",
+        "value": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountNameTidy')), variables('storageAccountApiVersion')).keys[0].value]"
+        },
+        "blobEndpoint": {
+        "type": "string",
+        "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountNameTidy'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountNameTidy')), variables('storageAccountApiVersion')).keys[0].value, ';EndpointSuffix=core.windows.net')]"
+        }
+    }
+}

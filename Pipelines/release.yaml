@@ -1,0 +1,231 @@
+# Two jobs in this file performing
+#       SQL Database provisioning
+#       Pre loading of Database Objects
+parameters:
+  - name: rgName # name of the parameter; required
+    type: string # data type of the parameter; required
+  - name: region # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: subscriptionId # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: keyVaultName # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: akv_blbKey # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: akv_accessSpnId # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: storageAccountName # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: rg04_blob_name # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: adf_dataFactoryName # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: adf_gitBranch # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: armConnection # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: stageType # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: connections_display_name # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  - name: deploymentMode # name of the parameter; required
+    type: string # data type of the parameter; required
+    default: ''
+  
+
+jobs:
+- deployment: armTemplateJobs
+  displayName: Provision data Resources
+  pool: 
+    vmImage: 'vs2017-win2016'
+  environment: 'SIMS-${{ parameters.stageType }}'
+  variables:
+    rg04_blob_endpoint: "https://${{ parameters.rg04_blob_name }}.blob.core.windows.net"
+    blob_endpoint: "https://${{ parameters.storageAccountName }}.blob.core.windows.net"
+  strategy:
+    runOnce:
+      deploy:       
+        steps:
+        - checkout: self    
+        # Validate & Deploy all the ARM template deployments        
+        # THIS SECTION IS USED TO GET THE SPN 
+        - task: AzureCLI@2
+          name: GetSPNdetails
+          condition: succeeded()
+          displayName: Get Current SPN details
+          inputs:
+            azureSubscription:  ${{ parameters.armConnection }}
+            scriptType: 'batch'
+            scriptLocation: 'inlineScript'
+            inlineScript: |
+              @ECHO OFF
+
+              for /f "delims=" %%i in ('az ad sp show --id %servicePrincipalId% --query "objectId"') do set "SPN_OBJECTID=%%i"
+              echo INFO: ObjectId: %SPN_OBJECTID% 
+              set SPN_OBJECTID=%SPN_OBJECTID:"=% 
+
+              echo INFO: After removing "" ObjectId: %SPN_OBJECTID% 
+
+              REM adding variable to pipeline
+              echo ##vso[task.setvariable variable=DevopsSpnId]%SPN_OBJECTID%
+              
+
+            addSpnToEnvironment: true  
+
+        # KeyVault    
+        - task: AzureResourceGroupDeployment@3
+          displayName: 'ARM Template deployment: Validate Keyvault'
+          inputs:
+            ConnectedServiceName: ${{ parameters.armConnection }}
+            subscriptionName: ${{ parameters.subscriptionId }}
+            action: 'Create Or Update Resource Group'
+            resourceGroupName: ${{ parameters.rgName }}
+            location: ${{ parameters.region }}
+            templateLocation: 'Linked artifact'
+            csmFile: 'KeyVault/azuredeploy.json'
+            csmParametersFile: 'KeyVault/azuredeploy.parameters.json'
+            overrideParameters: '-keyVaultName "${{ parameters.keyVaultName }}" -kv_accessSpnId "$(DevopsSpnId)" -EnvironmentType {{ parameters.stageType }}'
+            deploymentMode: ${{ parameters.deploymentMode }}
+        
+        # add key for encrypting Blob storage
+        - task: AzureCLI@2
+          displayName: 'Create Keyvault Key for Blob Storage'
+          inputs:
+            azureSubscription: ${{ parameters.armConnection }}
+            scriptType: 'batch'
+            scriptLocation: 'inlineScript'
+            inlineScript: |
+                @echo off
+                for /f "delims=" %%i in ('az keyvault key show --name "${{ parameters.akv_blbKey }}" --vault-name "${{ parameters.keyVaultName }}" --query "attributes.enabled"') do set "KEY_ENABLED=%%i"
+                echo INFO: key enabled: %KEY_ENABLED% 
+                
+                IF /I "%KEY_ENABLED%" == "" ( 
+                    echo "Creating new Blob Key"
+                    call az keyvault key create --vault-name "${{ parameters.keyVaultName }}" -n "${{ parameters.akv_blbKey }}" --protection software --size 3072
+                    echo INFO: Completed creating new key ${{ parameters.akv_blbKey }} for blob store
+                )
+                
+        # BlobStorage    
+        - task: AzureResourceGroupDeployment@3
+          displayName: 'ARM Template deployment: Validate Blob Storage'
+          inputs:
+            ConnectedServiceName: ${{ parameters.armConnection}}
+            subscriptionName: ${{ parameters.subscriptionId }}
+            action: 'Create Or Update Resource Group'
+            resourceGroupName: ${{ parameters.rgName }}
+            location: ${{ parameters.region }}
+            templateLocation: 'Linked artifact'
+            csmFile: 'BlobStorage/azuredeploy.json'
+            csmParametersFile: 'BlobStorage/azuredeploy.parameters.json'
+            overrideParameters: '-storageAccountName ${{ parameters.storageAccountName }} -EnvironmentType {{ parameters.stageType }}'
+            deploymentMode: ${{ parameters.deploymentMode }}
+        
+        # Synapse
+        - task: AzureResourceGroupDeployment@3
+          displayName: 'Azure Deployment: Deploy Synapse'
+          inputs:
+            ConnectedServiceName: ${{ parameters.armConnection}}
+            subscriptionName: ${{ parameters.subscriptionId }}
+            action: 'Create Or Update Resource Group'
+            resourceGroupName: ${{ parameters.rgName }}
+            location: ${{ parameters.region }}
+            templateLocation: 'Linked artifact'
+            csmFile: 'synapse/azuredeploy.json'
+            csmParametersFile: 'synapse/azuredeploy.parameters.json'
+            overrideParameters: '-synapseName ${{ parameters.synapseName }} -EnvironmentType {{ parameters.stageType }}' 
+            deploymentMode: ${{ parameters.deploymentMode }}
+
+        # download the Synapse build artifact
+        - task: DownloadBuildArtifacts@0
+          inputs:
+            buildType: 'specific'
+            project: ''
+            pipeline: ''
+            buildVersionToDownload: 'latest'
+            downloadType: 'single'
+            artifactName: 'synapse-template'
+            downloadPath: '$(System.DefaultWorkingDirectory)'
+      
+            
+         # Synapse from Build artifact
+        - task: AzureResourceGroupDeployment@3
+          displayName: 'Azure Deployment: Validate ADF'
+          inputs:
+           ConnectedServiceName: ${{ parameters.armConnection}}
+           subscriptionName: ${{ parameters.subscriptionId }}
+           action: 'Create Or Update Resource Group'
+           resourceGroupName: ${{ parameters.rgName }}
+           location: ${{ parameters.region }}
+           templateLocation: 'Linked artifact'
+           csmFile: 'synapse-template/template.json'
+           csmParametersFile: 'synapse-template/parameters.json'
+           overrideParameters: '-synapseName "${{ parameters.adf_dataFactoryName }}"'
+           deploymentMode: ${{ parameters.deploymentMode }}
+        
+        
+        - task: AzureCLI@2
+          displayName: 'Enable Encryption with Keyvault Key for Blob Storage'
+          inputs:
+            azureSubscription: ${{ parameters.armConnection }}
+            scriptType: 'batch'
+            scriptLocation: 'inlineScript'
+            inlineScript: |
+                @ECHO OFF
+                
+                echo INFO:Get the Managed Identity of the storage account ${{ parameters.storageAccountName }} 
+                for /f "delims=" %%i in ('az storage account show --name ${{ parameters.storageAccountName }} --resource-group ${{ parameters.rgName }} --query identity.principalId') do set "storage_account_principal=%%i"
+                echo storage_account_principal: %storage_account_principal% 
+            
+                echo INFO:Update Keyvault policy to allow access to the storage accounts managed identity
+                call az keyvault set-policy --name ${{ parameters.keyVaultName }} --resource-group ${{ parameters.rgName }} --object-id %storage_account_principal% --key-permissions get unwrapKey wrapKey
+            
+                echo INFO:Get the Keyvault URI
+                for /f "delims=" %%j in ('az keyvault show --name ${{ parameters.keyVaultName }} --resource-group ${{ parameters.rgName }} --query properties.vaultUri') do set "key_vault_uri=%%j"
+                echo keyvault:%key_vault_uri%
+            
+                echo INFO:Update Storage account to enable encryption with custom managed keys from keyvault
+                call az storage account update --name ${{ parameters.storageAccountName }} --resource-group ${{ parameters.rgName }} --encryption-key-name ${{ parameters.akv_blbKey }} --encryption-key-source Microsoft.Keyvault --encryption-key-vault %key_vault_uri%       
+                
+                echo INFO: Completed Az commands to enable Secure Blob storage with Key
+                    
+        - task: AzureCLI@2
+          displayName: 'Setup Access Policies'
+          inputs:
+            azureSubscription: ${{ parameters.armConnection }}
+            scriptType: 'batch'
+            scriptLocation: 'inlineScript'
+            inlineScript: |
+              @ECHO OFF
+              
+              echo INFO:Get the Managed Identity of the ADF ${{ parameters.adf_dataFactoryName }} 
+              for /f "delims=" %%i in ('az resource list -n ${{ parameters.adf_dataFactoryName }}  --query [*].identity.principalId --out tsv') do set "adf_principal=%%i"
+              echo adf_principal: %adf_principal% 
+          
+              echo INFO:Update Storage policy to allow access to the ADF managed identity
+              call az role assignment create --role "Contributor" --assignee %adf_principal% --scope /subscriptions/${{ parameters.subscriptionId }}/resourceGroups/${{ parameters.rgName }}/providers/Microsoft.Storage/storageAccounts/${{ parameters.storageAccountName }}
+              call az role assignment create --role "Storage Blob Data Contributor" --assignee %adf_principal% --scope /subscriptions/${{ parameters.subscriptionId }}/resourceGroups/${{ parameters.rgName }}/providers/Microsoft.Storage/storageAccounts/${{ parameters.storageAccountName }}
+              
+              echo INFO:Update Keyvault policy to allow access to the storage accounts managed identity
+              call az keyvault set-policy --name ${{ parameters.keyVaultName }} --resource-group ${{ parameters.rgName }} --object-id %adf_principal% --key-permissions get unwrapKey wrapKey
+        
+              echo Bypass access to Key vault for azure services
+              call az keyvault update --name ${{ parameters.keyVaultName }} --resource-group ${{ parameters.rgName }}  --bypass AzureServices
+          
+              echo Enable network ACLs set to Deny
+              call az keyvault update --name ${{ parameters.keyVaultName }} --resource-group ${{ parameters.rgName }} --default-action Deny
+              
+              echo INFO: COMPLETED SET UP OF ACCESS POLICIES for ${{ parameters.adf_dataFactoryName }} , ${{ parameters.storageAccountName }} and ${{ parameters.keyVaultName }}
+            
+      

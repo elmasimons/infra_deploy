@@ -1,0 +1,39 @@
+trigger:
+  - none
+
+stages:
+   
+- stage: DEV
+  # NOTE: Please provide valid values for the variables to be used for DEV
+  jobs:
+    - template: templates/release.yaml
+      parameters:
+        rgName: 'SIMS-Corp-Non-Prod-001' 
+        region: 'East US'
+        subscriptionId: '14b5f570-b7d0-4f5a-94bf-27abdd913dbb' 
+        keyVaultName: 'azuskv1poc001' 
+        akv_blbKey: 'blobEncryptionKey' # Name of the key used to encrypt ADF 
+        rg04_blob_name: 'azusblb1poc001' # Name of the IFM-RG04 data lake get it from DataPlatform team
+        storageAccountName: 'azusst1poc001' # Any name for storage, follow naming convention
+        synapseyName: 'azussy1poc001' # any name for ADF, follow naming convention
+        armConnection: 'sims-devops-dev' 
+        stageType: 'DEV'
+        deploymentMode: 'Incremental'
+
+- stage: UAT
+  # NOTE: Please provide valid values for the variables to be used for UAT
+  jobs:
+    - template: templates/release.yaml
+      parameters:
+        rgName: '' 
+        region: 'East US'
+        subscriptionId: '' 
+        keyVaultName: 'azuskv1uat001' 
+        akv_blbKey: 'blobEncryptionKey' # Name of the key used to encrypt ADF 
+        rg04_blob_name: 'azusblb1uat001' # Name of the IFM-RG04 data lake get it from DataPlatform team
+        storageAccountName: 'azusst1uat001' # Any name for storage, follow naming convention
+        synapseyName: 'azussy1uat001' # any name for ADF, follow naming convention
+        armConnection: 'sims-devops-uat' 
+        stageType: 'UAT'
+        deploymentMode: 'Incremental'
+    

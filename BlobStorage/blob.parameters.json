@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+      "storageAccountName": {
+          "value": ""
+      },
+      "accountType": {
+          "value": "Standard_LRS"
+      },
+      "kind": {
+          "value": "StorageV2"
+      },
+      "accessTier": {
+          "value": "Hot"
+      },
+      "minimumTlsVersion": {
+          "value": "TLS1_0"
+      },
+      "supportsHttpsTrafficOnly": {
+          "value": true
+      },
+      "allowBlobPublicAccess": {
+          "value": true
+      },
+      "encryptionEnabled": {
+        "value": true
+      },
+      "keySource": {
+          "value": "Microsoft.Storage"
+      },
+      "networkAclsBypass": {
+          "value": "AzureServices"
+      },
+      "networkAclsDefaultAction": {
+          "value": "Deny"
+      },
+       
+      "ApplicationName": {
+          "value": "SIMS.HCM"
+      }, 
+      "ApplicationOwner": {
+        "value": ""
+      }, 
+      "ApplicationSponsor": {
+        "value": ""
+      }, 
+      "EnvironmentType": {
+        "value": ""
+      }, 
+      "containerName": {
+        "value": ""
+      }, 
+      "needsSynapseConnection": {
+        "value": false
+      },
+      "needsContainer": {
+        "value": false
+      }
+      
+      
+  }
+}

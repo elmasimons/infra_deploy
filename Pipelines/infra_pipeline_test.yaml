@@ -1,0 +1,126 @@
+trigger:
+    - none
+  
+pool:
+  name: Azure Pipelines
+  vmImage: 'windows-latest'
+
+  
+variables:
+  RG: 'Sandbox_Elma'                                # sandbox
+  Region: 'East US'                                 # azure location  
+  # $(subscriptionId)'                # pipeline secret variable, IBM Training Tenant
+
+  ARMconnection: 'sandboxconnection'                # the Azure DevOps SPN 
+  keyVaultName: 'azdkv1elm001'                      # key vault to be used to store the secrets
+  storageAccountName: 'azdblb1elm001'
+  EnvironmentType: 'DEV'
+  dataFactoryName: 'azdfv2elm001' 
+  workspaceName: 'azdsynw1elm001'
+  datalakeStorageName: 'azddlk1elm001'
+  dataLakeStorageFilesystemName: 'default'
+  containerName: 'storagelayer'
+  # $(sqlAdministratorLoginPassword)  ## pipeline secret variable
+
+  
+jobs:
+- job: ProvisionInfra
+  displayName: Deploy Blob , key Vault , ADF and Web App
+  
+  steps:
+
+  # THIS SECTION IS USED TO GET THE SPN 
+  - task: AzureCLI@2
+    name: GetSPNdetails
+    condition: succeeded()
+    displayName: Get Current SPN details
+    inputs:
+      azureSubscription: '$(ARMconnection)'
+      scriptType: 'batch'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        @ECHO OFF
+        
+        REM adding variable to pipeline
+        echo ##vso[task.setvariable variable=DevopsSpnId]%servicePrincipalId%
+        
+        echo SPNid: %servicePrincipalId%
+      addSpnToEnvironment: true
+    
+  # Key vault    
+  - task: AzureResourceManagerTemplateDeployment@3
+    displayName: 'ARM Template deployment: Key Vault'
+    inputs:
+      deploymentScope: 'Resource Group'
+      azureResourceManagerConnection: '$(ARMconnection)'
+      subscriptionId: '$(subscriptionId)'
+      action: 'Create Or Update Resource Group'
+      resourceGroupName: '$(RG)'
+      location: '$(Region)'
+      templateLocation: 'Linked artifact'
+      csmFile: '$(System.DefaultWorkingDirectory)/data_infra/KeyVault/kv.template.json'
+      csmParametersFile: '$(System.DefaultWorkingDirectory)/data_infra/KeyVault/kv.parameters.json'
+      overrideParameters: '-keyVaultName "$(keyVaultName)" -EnvironmentType $(EnvironmentType) -kv_accessSpnId $(DevopsSpnId)'
+      deploymentMode: 'Incremental'
+
+  # Blob storage   #1
+  - task: AzureResourceManagerTemplateDeployment@3
+    displayName: 'ARM Template deployment: Blob Storage'
+    inputs:
+      deploymentScope: 'Resource Group'
+      azureResourceManagerConnection: $(ARMconnection)
+      subscriptionId: '$(subscriptionId)'
+      action: 'Create Or Update Resource Group'
+      resourceGroupName: '$(RG)'
+      location: '$(Region)'
+      templateLocation: 'Linked artifact'
+      csmFile: '$(System.DefaultWorkingDirectory)/data_infra/BlobStorage/blob.template.json'
+      csmParametersFile: '$(System.DefaultWorkingDirectory)/data_infra/BlobStorage/blob.parameters.json'
+      overrideParameters: '-storageAccountName "$(storageAccountName)" -EnvironmentType $(EnvironmentType)'
+      deploymentMode: 'Incremental'
+      deploymentOutputs: armoutputs
+
+
+# Extract Blob Storage details from ARM output    
+#- task: PowerShell@2
+#  displayName: 'Extract Blob Storage ARM outputs '
+#  inputs:
+#    filePath: 'scripts/extractArmOutput.ps1'
+
+#  - task: AzurePowerShell@5
+#    inputs:
+#      azureSubscription: '$(ARMconnection)'
+#      ScriptType: 'InlineScript'
+#      Inline: '$DataFactory = Set-AzDataFactoryV2 -ResourceGroupName ''$(RG)'' -Location ''$(Region)'' -Name ''$(dataFactoryName)'''
+#      azurePowerShellVersion: 'LatestVersion'
+        
+ # App Service Plan    
+  - task: AzureResourceManagerTemplateDeployment@3
+    displayName: 'ARM Template deployment: App Service Plan'
+    inputs:
+      deploymentScope: 'Resource Group'
+      azureResourceManagerConnection: '$(ARMconnection)'
+      subscriptionId: '$(subscriptionId)'
+      action: 'Create Or Update Resource Group'
+      resourceGroupName: '$(RG)'
+      location: '$(Region)'
+      templateLocation: 'Linked artifact'
+      csmFile: '$(System.DefaultWorkingDirectory)/data_infra/AppPlan/app.template.json'
+      csmParametersFile: '$(System.DefaultWorkingDirectory)/data_infra/AppPlan/app.parameters.json'
+      deploymentMode: 'Incremental'
+    
+ # web App    
+  - task: AzureResourceManagerTemplateDeployment@3
+    displayName: 'ARM Template deployment: Python Web App'
+    inputs:
+      deploymentScope: 'Resource Group'
+      azureResourceManagerConnection: '$(ARMconnection)'
+      subscriptionId: '$(subscriptionId)'
+      action: 'Create Or Update Resource Group'
+      resourceGroupName: '$(RG)'
+      location: '$(Region)'
+      templateLocation: 'Linked artifact'
+      csmFile: '$(System.DefaultWorkingDirectory)/data_infra/WebApp/webapp.template.json'
+      csmParametersFile: '$(System.DefaultWorkingDirectory)/data_infra/WebApp/webapp.parameters.json'
+      deploymentMode: 'Incremental'
+  

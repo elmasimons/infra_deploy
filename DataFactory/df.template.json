@@ -1,0 +1,68 @@
+{
+  "contentVersion": "1.0.0.0",
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "parameters": {
+      "apiVersion": {
+        "defaultValue": "2018-06-01",
+        "type": "String"
+    },
+    "dataFactoryName": {
+      "type": "String",
+      "metadata": {
+        "description": "Name of the data factory. Must be globally unique."
+      }
+    },
+    "CostCenter": {
+      "type": "string",
+      "metadata": {
+          "description": "Cost Center"
+      }
+    },
+  "ApplicationOwner": {
+      "type": "string",
+      "metadata": {
+          "description": "Provides the information on the App/Resource owner."
+      }
+  },
+  "EnvironmentType": {
+      "type": "string",
+      "metadata": {
+          "description": "Provides information on what the resource group is used for (useful for maintenance, policy enforcement, chargeback, etc.)."
+      }
+  },
+"DeploymentDate": {
+          "type": "string",
+          "defaultValue": "[utcNow('u')]",
+          "metadata": {
+              "description": "Provides the date when the asset were created."
+          }
+      }
+  },
+  "variables": {  },
+  "resources": [
+    {
+      "name": "[parameters('dataFactoryName')]",
+      "apiVersion": "[parameters('apiVersion')]",
+      "type": "Microsoft.DataFactory/factories",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "CostCenter": "[parameters('CostCenter')]",
+        "ApplicationOwner": "[parameters('ApplicationOwner')]",
+        "EnvironmentType": "[parameters('EnvironmentType')]",
+        "ExpirationDate":"[dateTimeAdd(parameters('DeploymentDate'), 'P10Y')]",
+        "DeploymentDate": "[parameters('DeploymentDate')]"
+      },
+      "properties": {  },
+      "identity": {
+        "type": "SystemAssigned"
+      }
+    }
+  ],
+
+  "outputs": {
+      "adfIdentityId": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.DataFactory/factories', parameters('dataFactoryName')), parameters('apiVersion'), 'full').identity.principalId]"
+        }
+  }
+}

@@ -1,0 +1,30 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "subscriptionId": {
+            "value": "05bc92a8-0ea0-4c4d-b5d7-cd6d9eefe888"
+        },
+        "name": {
+            "value": "elmdemoapp"
+        },
+        "location": {
+            "value": "East US"
+        },
+        "hostingPlanName": {
+            "value": "demoappplan"
+        },
+        "serverFarmResourceGroup": {
+            "value": "sandbox_elma"
+        },
+        "alwaysOn": {
+            "value": false
+        },
+        "ftpsState": {
+            "value": "FtpsOnly"
+        },
+        "linuxFxVersion": {
+            "value": "PYTHON|3.7"
+        }
+    }
+}

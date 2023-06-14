@@ -1,0 +1,142 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "keyVaultName": {
+      "defaultValue": "azieha1aug256",
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Vault"
+      }
+    },
+    "kv_accessSpnId": {
+        "type": "string",
+        "metadata": {
+            "description": "The AZ devops SPN id which needs to have access to the newly created key vault"
+        }
+    },
+    "networkAclsBypass": {
+        "defaultValue": "",
+        "type": "string",
+        "metadata": {
+            "description": "Indicates whether network Acls bypass."
+        }
+    },
+    "networkAclsDefaultAction": {
+        "defaultValue": "",
+        "type": "string",
+        "metadata": {
+            "description": "Indicates network Acls default action"
+        }
+    },
+    "ApplicationName": {
+        "type": "string",
+        "metadata": {
+            "description": "Business Line Sodexo Region Sodexo Country Name of the application (8-letter code)."
+        }
+    },
+    "ApplicationOwner": {
+        "type": "string",
+        "metadata": {
+            "description": "Provide information on the App/Resource owner."
+        }
+    },
+    "ApplicationSponsor": {
+        "type": "string",
+        "metadata": {
+            "description": "Provide information on the App/Resource sponsor."
+        }
+    },
+    "EnvironmentType": {
+        "type": "string",
+        "metadata": {
+            "description": "Provides information on what the resource group is used for (useful for maintenance, policy enforcement, chargeback, etc.)."
+        }
+    },
+    "DeploymentDate": {
+        "type": "string",
+        "defaultValue": "[utcNow('u')]",
+        "metadata": {
+            "description": "Provides the date when the asset were created."
+        }
+    },
+    "tenantId": {
+      "type": "string",
+      "defaultValue": "[subscription().tenantId]",
+      "metadata": {
+        "description": "Tenant Id of the subscription. Get using Get-AzureRmSubscription cmdlet or Get Subscription API"
+      }
+    },
+    "accessPolicies": {
+      "type": "array",
+      "defaultValue": [
+        {              
+          "tenantId": "[parameters('tenantId')]",
+          "objectId": "[parameters('kv_accessSpnId')]", 
+          "permissions": {
+            "keys": [ "get", "create", "delete", "list", "update", "import", "backup", "restore" ],
+            "secrets": [ "all" ]
+          }
+        }
+      ]
+    },
+    "skuName": {
+      "type": "string",
+      "defaultValue": "Standard",
+      "allowedValues": [
+        "Standard",
+        "Premium"
+      ],
+      "metadata": {
+        "description": "SKU for the vault"
+      }
+    }
+  },
+ 
+  "resources": [
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-02-01",
+      "name": "[parameters('keyVaultName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+            "ApplicationName": "[parameters('ApplicationName')]",
+            "ApplicationOwner": "[parameters('ApplicationOwner')]",
+            "ApplicationSponsor": "[parameters('ApplicationSponsor')]",
+            "EnvironmentType": "[parameters('EnvironmentType')]",
+            "ExpirationDate":"[dateTimeAdd(parameters('DeploymentDate'), 'P10Y')]",
+            "DeploymentDate": "[parameters('DeploymentDate')]"
+      },
+      "properties": {
+        "tenantId": "[parameters('tenantId')]",
+        "accessPolicies": "[parameters('accessPolicies')]",
+        "sku": {
+          "name": "[parameters('skuName')]",
+          "family": "A"
+        },
+        "enableSoftDelete": true,
+        "enabledForTemplateDeployment": true,
+        "enablePurgeProtection": true,
+        "enabledForDeployment": true
+        // "networkAcls": {
+        //     "bypass": "[parameters('networkAclsBypass')]",
+        //     "defaultAction": "[parameters('networkAclsDefaultAction')]",
+        //     "ipRules": []
+        // }        
+      },
+      "resources": []
+    }
+    // , {
+    //   "type": "Microsoft.KeyVault/vaults/providers/locks",
+    //   "apiVersion": "2016-09-01",
+    //   "name": "[concat(parameters('keyVaultName'), '/Microsoft.Authorization/vaultsLock')]",
+    //   "dependsOn": [
+    //       "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+    //   ],
+    //   "properties": {
+    //       "level": "CanNotDelete",
+    //       "notes": "Azure Key Vault should not be deleted."
+    //   }
+    // }
+  ]
+}

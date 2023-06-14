@@ -1,0 +1,98 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspaceName": {
+            "type": "String"
+        },
+       "dataLakeStorageName": {
+            "type": "string"
+        },
+        "dataLakeStorageFilesystemName": {
+            "type": "string"
+        },
+        "sqlAdministratorLogin": {
+            "type": "string"
+        },
+        "sqlAdministratorLoginPassword": {
+            "type": "secureString",
+            "defaultValue": ""
+        },
+        
+        "ApplicationName": {
+        "type": "string",
+        "metadata": {
+            "description": "Application name"
+        }
+        },
+        "ApplicationOwner": {
+            "type": "string",
+            "metadata": {
+                "description": "Provide information on the App/Resource owner."
+            }
+        },
+        "ApplicationSponsor": {
+            "type": "string",
+            "metadata": {
+                "description": "Provide information on the App/Resource sponsor."
+            }
+        },
+        "EnvironmentType": {
+        "type": "string",
+        "metadata": {
+            "description": "Provides information on what the resource group is used for (useful for maintenance, policy enforcement, chargeback, etc.)."
+        }
+        },
+        "DeploymentDate": {
+            "type": "string",
+            "defaultValue": "[utcNow('u')]",
+            "metadata": {
+                "description": "Provides the date when the asset were created."
+            }
+        },
+        "managedVirtualNetwork": {
+            "type": "string",
+            "allowedValues": [
+                "default",
+                ""
+            ]
+        }
+        
+    },
+    "variables": {
+        "dataLakeStorageAccountUrl": "[concat('https://', parameters('datalakeStorageName'), '.dfs.core.windows.net')]",
+        
+    },
+    
+    "resources": [
+        {
+          "name": "[parameters('workspaceName')]",
+          "type": "Microsoft.Synapse/workspaces",
+          "apiVersion": "2021-03-01",
+          "tags": {
+            "ApplicationName": "[parameters('ApplicationName')]",
+            "ApplicationOwner": "[parameters('ApplicationOwner')]",
+            "ApplicationSponsor": "[parameters('ApplicationSponsor')]",
+            "EnvironmentType": "[parameters('EnvironmentType')]",
+            "ExpirationDate":"[dateTimeAdd(parameters('DeploymentDate'), 'P10Y')]",
+            "DeploymentDate": "[parameters('DeploymentDate')]"
+          },
+          "location": "[resourceGroup().location]",
+          "identity": {
+            "type": "SystemAssigned"
+          },
+          "properties": {
+             "defaultDataLakeStorage": {
+                "accountUrl": "[variables('dataLakeStorageAccountUrl')]",
+                "filesystem": "[parameters('dataLakeStorageFilesystemName')]"
+             },
+             "sqlAdministratorLogin": "[parameters('sqlAdministratorLogin')]",
+             "sqlAdministratorLoginPassword": "[parameters('sqlAdministratorLoginPassword')]",
+             "managedVirtualNetwork": "[parameters('managedVirtualNetwork')]"
+           
+        }
+       }
+      ],      
+
+      "outputs": {}
+}
